@@ -1,18 +1,17 @@
 from db import *
 from crawlers.crawlers import Crawler
 import tool.config as config
+from crawlers.plugins.BUPTCAS import CAS
 
 import time, requests
+from urllib.parse import urlparse, parse_qs, quote
+from datetime import datetime, timedelta
+from base64 import b64encode
 
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 
 user_name = config.BUPT_USERNAME
 password = config.BUPT_PASSWORD
-url_all_course = "https://apiucloud.bupt.edu.cn/ykt-site/site/list/student/current?userId="
+url_all_course = "https://apiucloud.bupt.edu.cn/ykt-site/site/list/student/current?size=999&userId="
 url_work_per_course = "https://apiucloud.bupt.edu.cn/ykt-site/work/student/list"
 url_assignment = "https://apiucloud.bupt.edu.cn/ykt-site/work/detail?assignmentId="
 
@@ -28,8 +27,15 @@ class BUPTHomeWorkCrawler(Crawler):
         self.name = 'bupt_homework_crawler'
         self.description = '爬取bupt作业的信息'
         self.status = '1'
-        self.url = 'https://ucloud.bupt.edu.cn/'
+        self.login_url ="https://auth.bupt.edu.cn/authserver/login?service=http://ucloud.bupt.edu.cn"
+        self.token_url = "https://apiucloud.bupt.edu.cn/ykt-basics/oauth/token"
+        self.info_url = "https://apiucloud.bupt.edu.cn/ykt-basics/info"
+        self.current_url = "https://apiucloud.bupt.edu.cn/ykt-site/base-term/current"
+        self.user_url = "https://apiucloud.bupt.edu.cn/ykt-basics/userroledomaindept/listByUserId"
+        self.check_url = "https://apiucloud.bupt.edu.cn/blade-portal/home-page-info/getShufflingWebList"
         self.cron = "*/20 * * * *"
+        self.session = CAS()
+        self._login()
 
     def run(self):
         """
@@ -43,10 +49,11 @@ class BUPTHomeWorkCrawler(Crawler):
             None
         """
         print(self.name + " start running")
-        cookies = self.get_cookies()
-        info = BUPTHomeWorkCrawler.parse_cookies(cookies)
-        headers = info['header']
-        uuid = info['uuid']
+        uuid = self.user_id
+        headers = {
+            "Authorization": self.authorization,
+            "Blade-Auth": self.access_token
+        }
         course_id = self.get_all_course(uuid=uuid,headers=headers)
         database.connect()
         for course_name,course_id in course_id.items():
@@ -84,7 +91,7 @@ class BUPTHomeWorkCrawler(Crawler):
         返回值:
             返回一个元组，包含作业内容和作业资源。
             '''
-        response = requests.get(url_assignment+assignment_id,headers=headers)
+        response = self.session.get(url_assignment+assignment_id,headers=headers)
         data = response.json()["data"]
         content = data["assignmentContent"]
         resources=data['assignmentResource']
@@ -122,7 +129,7 @@ class BUPTHomeWorkCrawler(Crawler):
             "userId": uuid,
             "current": 1
         }
-        response = requests.post(url_work_per_course, json=payload,headers=headers)
+        response = self.session.post(url_work_per_course, json=payload,headers=headers)
         data = response.json()
         records = data['data']['records']
         unsubmitted_jobs = []
@@ -161,71 +168,86 @@ class BUPTHomeWorkCrawler(Crawler):
         返回值:
             返回一个字典，包含课程名称和课程ID。
         '''
-        course = list(requests.get(url_all_course+uuid, headers=headers).json()["data"]["records"])
+        course = list(self.session.get(url_all_course+uuid,headers=headers).json()["data"]["records"])
         course_id = {}
         for c in course:
             course_id[c["siteName"]] = c["id"]
         return course_id
     
-    @staticmethod
-    def parse_cookies(cookies:list) -> dict:
-        '''
-        解析cookies
-        该函数用于解析cookies，提取请求头和UUID。
-        参数:
-            cookies: cookies
-        返回值:
-            返回一个字典，包含请求头和UUID。
-        '''
-        header = {
-            'User-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.31',
-        }
-        uuid = ''
-        token = ''
-        info = {}
+    def _login(self):
+        self.authorization = "Basic " + b64encode("portal:portal_secret".encode()).decode()
+        resp = self.session.get(self.login_url)
+        self.ticket = parse_qs(urlparse(resp.url).query)["ticket"][0]
+        resp = self.session.post(
+            self.token_url,
+            headers={
+                "Authorization": self.authorization,
+            },
+            data={
+                "ticket": self.ticket,
+                "grant_type": "third"
+            }
+        )
+        data = resp.json()
+        self.user_id = data["user_id"]
+        self.access_token = data["access_token"]
+        self.refresh_token = data["refresh_token"]
+        self.role_name = data["role_name"]
+        self.loginId = data["loginId"]
+        self.user_name = data["user_name"]
+        self.real_name = data["real_name"]
+        self.avatar = data["avatar"]
+        self.dept_id = data["dept_id"]
+        self.identity = f"{self.role_name}:{self.dept_id}"
+        self._get_cookies()
+    
+    def _get_cookies(self):
+        info = self.session.get(
+            self.info_url,
+            headers={
+                "Authorization": self.authorization,
+                "Blade-Auth": self.access_token
+            }
+        ).json()["data"]
+        current = self.session.get(
+            self.current_url,
+            headers={
+                "Authorization": self.authorization,
+                "Blade-Auth": self.access_token
+            }
+        ).json()["data"]
+        user = self.session.get(
+            self.user_url,
+            headers={
+                "Authorization": self.authorization,
+                "Blade-Auth": self.access_token
+            }
+        ).json()["data"]
+
+        cookies = {}
+        cookies["iClass-uuid"] = self.user_id
+        cookies["iClass-token"] = self.access_token
+        cookies["iClass-refresh_token"] = self.refresh_token
+        cookies["iClass-login-meth"] = "icloud"
+        cookies["iClass-expert-account"] = self.user_name
+        cookies["iClass-real_name"] = quote(self.real_name)
+        cookies["iClass-role_name"] = self.role_name
+        cookies["iClass-avatar"] = self.avatar
+        cookies["iClass-loginId"] = self.loginId
+        cookies["iClass-user-info"] = quote(str(info))
+        cookies["iClass-current-term"] = quote(str(current))
+        cookies["iClass-identity"] = self.identity
+        cookies["iClass-user-role"] = quote(str(user[0]))
+        cookies["iClass-login-roles"] = quote(str(user))
 
         for cookie in cookies:
-            if  cookie['name'] == 'iClass-token':
-                token = cookie['value']
-                header['Blade-Auth'] = cookie['value']
-            if  cookie['name'] == 'iClass-uuid':
-                uuid = cookie['value']
+            self.session.cookies.set(
+                name=cookie,
+                value=cookies[cookie],
+                domain="ucloud.bupt.edu.cn",
+                expires=(datetime.now() + timedelta(hours=1)).timestamp()
+            )
 
-        info['header'] = header
-        info['uuid'] = uuid
-        info['token'] = token
-        return info
-
-
-    def get_cookies(self) -> list:
-        '''
-        获取cookies
-        该函数用于获取cookies。
-        参数:
-            无
-        返回值:
-            返回一个列表，包含cookies。
-        '''
-        options = Options()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        driver = webdriver.Chrome(options=options)
-        driver.execute_script(f"window.open('{self.url}', '_blank');")
-        time.sleep(3)   # 由于反爬机制，我们不能直接使用driver.get()方法，而是使用execute_script()方法打开新的标签页，推测因为太快切换标签页会被识别为机器人
-        driver.switch_to.window(driver.window_handles[1])
-        driver.switch_to.frame('loginIframe')
-        password_login = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//*[@id="content-title"]/a[2]')))
-        time.sleep(3)
-        password_login.click()
-        user_account_input = driver.find_element(By.ID, 'username')
-        user_account_input.send_keys(user_name)
-        password_input = driver.find_element(By.ID, 'password')
-        password_input.send_keys(password)
-        login_button = driver.find_element(By.XPATH, '/html/body/div[3]/div/div/div[3]/div[2]/div[7]/input')
-        login_button.click()
-        time.sleep(3)
-        cookies = driver.get_cookies()
-        driver.quit()
-        return cookies
 if __name__ == '__main__':
     c = BUPTHomeWorkCrawler()
     c.run()

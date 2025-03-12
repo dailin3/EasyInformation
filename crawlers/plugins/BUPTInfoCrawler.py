@@ -1,17 +1,13 @@
 from db import *
 from crawlers.crawlers import Crawler
 import tool.config as config
+from crawlers.plugins.BUPTCAS import CAS
 
 import requests,time
 from bs4 import BeautifulSoup
 from ai.ai import get_ai
 from notification import Notifier,Notification
 
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
 
 user_name = config.BUPT_USERNAME
 password = config.BUPT_PASSWORD
@@ -34,6 +30,9 @@ class BUPTInfoCrawler(Crawler):
         self.ai_tool,_,_  = get_ai()
         self.cron = "*/10 * * * *"
         self.notifier = Notifier()
+        self.session = CAS()
+        # redirect to main page
+        self.session.get(self.url)
 
     def run(self):
         '''
@@ -48,15 +47,13 @@ class BUPTInfoCrawler(Crawler):
             无
         '''
         print(self.name + " start running")
-        # 获取session
-        cookies = self.get_cookies()
 
         # 获取信息列表
-        info_list = self.get_info_list(cookies)
+        info_list = self.get_info_list()
 
         # 将信息内容写入info_list
         for info_element in info_list:
-            info_element = self.write_info_content(info_element, cookies)
+            info_element = self.write_info_content(info_element)
             print(info_element)
 
         # 将信息存入数据库
@@ -112,7 +109,7 @@ class BUPTInfoCrawler(Crawler):
             print(f"Saved {info['title']} to database.")
         database.close()
         
-    def get_info_list(self, cookies:dict) -> list:
+    def get_info_list(self) -> list:
         '''
         获取信息列表
 
@@ -136,15 +133,10 @@ class BUPTInfoCrawler(Crawler):
                 - 'content': 内容
                 - 'discription': 描述,额外的备注
         '''
-        # 构造请求头，将cookies添加到请求头中
-        headers={}
-        cookie_strings = []
-        for cookie in cookies:
-            cookie_strings.append(f"{cookie['name']}={cookie['value']}")
-        headers['Cookie'] = '; '.join(cookie_strings)
 
         # 发送GET请求，获取网页内容
-        response = requests.get(self.url, headers=headers)
+        response = self.session.get(self.url)
+        print(response.text)
         soup = BeautifulSoup(response.text, 'html.parser')
         a_element = soup.find_all('a')
         for a_tag in a_element:
@@ -153,7 +145,7 @@ class BUPTInfoCrawler(Crawler):
                 break
         
         url =self.main_page+target_element['href']
-        response = requests.get(url, headers=headers)
+        response = self.session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         tr_elements = soup.find('ul', class_='newslist').find_all('li')
         info_list = []
@@ -179,7 +171,7 @@ class BUPTInfoCrawler(Crawler):
             info_list.append(row)
         return info_list
     
-    def write_info_content(self, info_element:dict,cookies: dict) -> dict:
+    def write_info_content(self, info_element:dict) -> dict:
         '''
         爬取信息门户的信息内容
 
@@ -192,53 +184,27 @@ class BUPTInfoCrawler(Crawler):
         返回值:
             返回更新后的info_element字典，包含了爬取到的信息内容。
         '''
-        # 构造请求头，将cookies添加到请求头中
-        headers={}
-        cookie_strings = []
-        for cookie in cookies:
-            cookie_strings.append(f"{cookie['name']}={cookie['value']}")
-        headers['Cookie'] = '; '.join(cookie_strings)
 
         # 发送GET请求，获取网页内容
-        response = requests.get(info_element['href'], headers=headers)
+        response = self.session.get(info_element['href'])
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # 解析网页，获取信息内容
-        content = soup.find('div', class_='v_news_content').text
+        content_list = []
+        content = soup.find('div', class_='v_news_content')
+        for elem in content.children:
+            if elem.name == 'p':
+                content_list.append({"type":"p","content":elem.text})
+            elif elem.name == 'img':
+                content_list.append({"type":"img","href":elem['src']})
+            elif elem.name == 'a':
+                content_list.append({"type":"a","href":elem['href'],"content":elem.text})
+        
 
         # 将信息内容添加到info_element字典中
-        info_element['content'] = content
+        info_element['content'] = content_list
 
         return info_element
-
-    def get_cookies(self) -> list:
-        '''
-        获取cookies
-        该函数用于获取cookies。
-        参数:
-            无
-        返回值:
-            返回一个列表，包含cookies。
-        '''
-        options = Options()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        driver = webdriver.Chrome(options=options)
-        driver.execute_script(f"window.open('{self.url}', '_blank');")
-        time.sleep(2)   # 由于反爬机制，我们不能直接使用driver.get()方法，而是使用execute_script()方法打开新的标签页，推测因为太快切换标签页会被识别为机器人
-        driver.switch_to.window(driver.window_handles[1])
-        driver.switch_to.frame('loginIframe')
-        password_login = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//*[@id="content-title"]/a[2]')))
-        password_login.click()
-        user_account_input = driver.find_element(By.ID, 'username')
-        user_account_input.send_keys(user_name)
-        password_input = driver.find_element(By.ID, 'password')
-        password_input.send_keys(password)
-        login_button = driver.find_element(By.XPATH, '/html/body/div[3]/div/div/div[3]/div[2]/div[7]/input')
-        login_button.click()
-        time.sleep(5)
-        cookies = driver.get_cookies()
-        driver.quit()
-        return cookies
     
     def get_time(self):
         '''

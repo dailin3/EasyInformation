@@ -5,9 +5,12 @@ from notification import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
     
+scheduler = BackgroundScheduler()
+
 def start_crawlers_threads():
+    # to start add all crawlers into scheduler
+
     # TODO: add a setting from config function
-    scheduler = BackgroundScheduler()
     for crawler_inst in crawlers:
         if crawler_inst.status == "1":
             cron = CronTrigger().from_crontab(crawler_inst.cron)
@@ -16,10 +19,9 @@ def start_crawlers_threads():
             print(name + " join to scheduler")
     scheduler.start()
 
-class AIThread():
-    pass
 
 class NotificationThread():
+    # to clear the notifications table
     def init(self):
         self.is_alive = False
         self.thread = threading.Thread(target=self.start_loop, name='notification_thread')

@@ -76,5 +76,5 @@ class Notifications(BaseModel):
 
 if __name__ == '__main__':
     database.connect()
-    database.create_tables([Info, Assignments,Notification])
+    database.create_tables([Info, Assignments,Notifications])
     database.close()
