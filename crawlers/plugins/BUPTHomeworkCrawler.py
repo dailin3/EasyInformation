@@ -1,6 +1,6 @@
 from db import *
 from crawlers.crawlers import Crawler
-import tool.config as config
+import config as config
 from crawlers.plugins.BUPTCAS import CAS
 
 import time, requests
@@ -34,8 +34,6 @@ class BUPTHomeWorkCrawler(Crawler):
         self.user_url = "https://apiucloud.bupt.edu.cn/ykt-basics/userroledomaindept/listByUserId"
         self.check_url = "https://apiucloud.bupt.edu.cn/blade-portal/home-page-info/getShufflingWebList"
         self.cron = "*/20 * * * *"
-        self.session = CAS()
-        self._login()
 
     def run(self):
         """
@@ -48,6 +46,8 @@ class BUPTHomeWorkCrawler(Crawler):
         返回:
             None
         """
+        self._login()
+
         print(self.name + " start running")
         uuid = self.user_id
         headers = {
@@ -175,6 +175,7 @@ class BUPTHomeWorkCrawler(Crawler):
         return course_id
     
     def _login(self):
+        self.session = CAS()
         self.authorization = "Basic " + b64encode("portal:portal_secret".encode()).decode()
         resp = self.session.get(self.login_url)
         self.ticket = parse_qs(urlparse(resp.url).query)["ticket"][0]
@@ -189,6 +190,7 @@ class BUPTHomeWorkCrawler(Crawler):
             }
         )
         data = resp.json()
+        print(data)
         self.user_id = data["user_id"]
         self.access_token = data["access_token"]
         self.refresh_token = data["refresh_token"]

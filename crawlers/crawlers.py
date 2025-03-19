@@ -1,6 +1,6 @@
 import json
 import importlib.util
-import tool.config as config, os
+import config as config, os
 from abc import ABC, abstractmethod
 
 default_interval = 60

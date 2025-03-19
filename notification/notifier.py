@@ -1,6 +1,6 @@
 from .plugins import BarkNotification
 from .notification import Notification
-import tool.config as config
+import config as config
 
 bark_token = config.BARK_TOKEN
 defalt_clients = ['bark']

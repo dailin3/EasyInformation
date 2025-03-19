@@ -1,6 +1,6 @@
 from db import *
 from crawlers.crawlers import Crawler
-import tool.config as config
+import config as config
 from crawlers.plugins.BUPTCAS import CAS
 
 import requests,time
@@ -63,7 +63,7 @@ class BUPTInfoCrawler(Crawler):
         database.connect()
         for info in info_list:
             # use ai to parse the info
-            summary = self.ai_tool.summerize(info['content'])
+            summary = self.ai_tool.summerize(str(info['content']))
             importance = self.ai_tool.parse_importance(summary)
             group = self.ai_tool.parse_category(summary)
 
@@ -151,7 +151,7 @@ class BUPTInfoCrawler(Crawler):
         info_list = []
         for tr_element in tr_elements:
             crawler_name = self.name
-            type = 'text'
+            type = 'text/json'
             href = self.main_page + tr_element.find('a').get('href')
             title = tr_element.find('a').text
             author = tr_element.find('span', class_='author').text

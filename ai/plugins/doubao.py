@@ -1,5 +1,5 @@
 from openai import OpenAI
-import tool.config as config
+import config as config
 import re, os
 from ai.ai_callable import AI_callable
 
@@ -40,7 +40,7 @@ class AI_Tool:
         return int(result)
     
     def parse_category(self, text):
-        category = "学术,活动,通知,政务,娱乐,其他"
+        category = str(config.CATEGORY)
         response = self.client.chat.completions.create(
             model=self.MODEL_ENDPOINT_ID,
             messages=[
@@ -49,7 +49,7 @@ class AI_Tool:
             ]
         )
         result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
-        if result == "空":
+        if result == "空" or result not in config.CATEGORY:
             print("parse_category failed:"+text)
             return "其他"
         return result

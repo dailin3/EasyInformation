@@ -1,5 +1,4 @@
 from peewee import *
-from typing import Optional
 from notification import Notification
 
 database = SqliteDatabase('db/main.db')
