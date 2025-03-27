@@ -24,7 +24,7 @@ class BUPTInfoCrawler(Crawler):
         super().__init__()
         self.name = 'bupt_info_crawler'
         self.description = '爬取bupt信息门户的信息'
-        self.status = '0'
+        self.status = '1'
         self.url = 'http://my.bupt.edu.cn/xs_index.jsp?urltype=tree.TreeTempUrl&wbtreeid=1541'
         self.main_page = 'http://my.bupt.edu.cn/'
         self.ai_tool,_,_  = get_ai()

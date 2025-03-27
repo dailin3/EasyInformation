@@ -8,9 +8,9 @@ defalt_clients = ['bark']
 class Notifier():
     def __init__(self, clients = None):
         if clients is None:
-            self.clients = get_clients(defalt_clients)
+            self.clients = list(get_clients(defalt_clients))
         else:
-            self.clients = get_clients(clients)
+            self.clients = list(get_clients(clients))
 
     def send(self,notification: Notification):
         for client in self.clients:

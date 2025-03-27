@@ -1,9 +1,11 @@
 import threading
+import config
 from crawlers import *
 from db import *
 from notification import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+import time
     
 scheduler = BackgroundScheduler()
 
@@ -22,16 +24,20 @@ def start_crawlers_threads():
 
 class NotificationThread():
     # to clear the notifications table
-    def init(self):
-        self.is_alive = False
-        self.thread = threading.Thread(target=self.start_loop, name='notification_thread')
+    def __init__(self):
+        self.is_alive = True
+        self.thread = threading.Thread(target=self.loop, name='notification_thread')
         self.notifier = Notifier()
-        self.interval = 1000  # TODO: Add interval setting
+        self.interval = config.NOTIFICATION_INTERVAL  # TODO: Add interval setting
 
-    def start_loop(self):
+    def loop(self):
         while self.is_alive:
             self.send_notifications()
-            self.thread.wait(self.interval)
+            time.sleep(self.interval)
+    
+    def start_loop(self):
+        self.thread.start()
+        print("notification thread started")
             
     def send_notifications(self):
         # TODO: Add time judgement
@@ -43,3 +49,7 @@ class NotificationThread():
             notification.save()
         database.close()
 
+    def stop(self):
+        self.is_alive = False
+        self.thread.join()
+        print("notification thread stoped")
