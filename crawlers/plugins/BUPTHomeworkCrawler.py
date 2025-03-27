@@ -52,7 +52,8 @@ class BUPTHomeWorkCrawler(Crawler):
         headers = info['header']
         uuid = info['uuid']
         course_id = self.get_all_course(uuid=uuid,headers=headers)
-        database.connect()
+        if database.is_closed:
+            database.connect()
         for course_name,course_id in course_id.items():
             assignment_info = self.get_unfinished_per_course(course_id,course_name,uuid,headers)
             for job in assignment_info:
@@ -74,7 +75,7 @@ class BUPTHomeWorkCrawler(Crawler):
                 self.do_notification(job,created,work)
 
         database.close()
-        print("作业爬取完成")
+        print(self.name + " stop running")
 
     
     def do_notification(self,job,created,work):

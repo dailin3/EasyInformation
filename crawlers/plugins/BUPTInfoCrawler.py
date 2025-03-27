@@ -54,13 +54,15 @@ class BUPTInfoCrawler(Crawler):
         # 将信息内容写入info_list
         for info_element in info_list:
             info_element = self.write_info_content(info_element)
-            print(info_element)
 
         # 将信息存入数据库
         self.save_info_list(info_list)
 
+        print(self.name + " stop running")
+
     def save_info_list(self, info_list: list) -> None:
-        database.connect()
+        if database.is_closed:
+            database.connect()
         for info in info_list:
             # use ai to parse the info
             summary = self.ai_tool.summerize(str(info['content']))
@@ -68,14 +70,12 @@ class BUPTInfoCrawler(Crawler):
             group = self.ai_tool.parse_category(summary)
 
             # parse the notification level
-            if importance < 25:
+            if importance < 50:
                 level = 0
-            elif importance < 50:
-                level = 1
             elif importance < 75:
-                level = 2
+                level = 1
             else:
-                level = 3
+                level = 2
             # use href unique tag to check if the info exist in db, and save the new info
             info_db, created=Info.get_or_create(
                 crawler_name=info['crawler_name'],
@@ -97,7 +97,7 @@ class BUPTInfoCrawler(Crawler):
                 }
             )
             # if not exist in DB
-            if created:
+            if created :
                 self.notifier.send(Notification(
                     title=info['title'],
                     content=summary,
@@ -106,7 +106,7 @@ class BUPTInfoCrawler(Crawler):
                     url=info['href']
                 ))
                 print(f"send the message: {info['title']}")
-            print(f"Saved {info['title']} to database.")
+                print(f"Saved {info['title']} to database.")
         database.close()
         
     def get_info_list(self) -> list:
@@ -136,7 +136,6 @@ class BUPTInfoCrawler(Crawler):
 
         # 发送GET请求，获取网页内容
         response = self.session.get(self.url)
-        print(response.text)
         soup = BeautifulSoup(response.text, 'html.parser')
         a_element = soup.find_all('a')
         for a_tag in a_element:
