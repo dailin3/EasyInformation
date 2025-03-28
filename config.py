@@ -3,6 +3,8 @@ import dotenv
 
 dotenv.load_dotenv()
 
+HOST = os.getenv("HOST")
+PORT = os.getenv("PORT")
 CWD = os.getcwd()
 BUPT_USERNAME=os.getenv("BUPT_USERNAME")
 BUPT_PASSWORD=os.getenv("BUPT_PASSWORD")

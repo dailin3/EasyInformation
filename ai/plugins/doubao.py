@@ -22,7 +22,10 @@ class AI_Tool:
                 {"role": "user", "content": text}
             ]
         )
-        result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        try:
+            result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        except IndexError:
+            result = "空"
         return result
     
     def parse_importance(self, text):
@@ -33,7 +36,11 @@ class AI_Tool:
                 {"role": "user", "content": text}
             ]
         )
-        result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        try:
+            result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        except IndexError:
+            result = "空"
+
         if result == "空":
             print("parse_importance failed:"+text)
             return 0
@@ -48,7 +55,10 @@ class AI_Tool:
                 {"role": "user", "content": text}
             ]
         )
-        result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        try:
+            result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        except IndexError:
+            result = "空"
         if result == "空" or result not in config.CATEGORY:
             print("parse_category failed:"+text)
             return "其他"
@@ -62,7 +72,10 @@ class AI_Tool:
                 {"role": "user", "content": text2}
             ]
         )
-        result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        try:
+            result = re.findall(r"\$(.*?)\$",response.choices[0].message.content)[0]
+        except IndexError:
+            result = "空"
         if result == "空":
             print("parse_ralation failed:"+text1+" "+text2)
             return 0

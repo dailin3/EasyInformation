@@ -3,7 +3,7 @@ from crawlers.crawlers import Crawler
 import config as config
 from crawlers.plugins.BUPTCAS import CAS
 
-import requests,time
+import requests,time,json
 from bs4 import BeautifulSoup
 from ai.ai import get_ai
 from notification import Notifier,Notification
@@ -212,7 +212,7 @@ class BUPTInfoCrawler(Crawler):
         
 
         # 将信息内容添加到info_element字典中
-        info_element['content'] = content_list
+        info_element['content'] = json.dumps(content_list)
 
         return info_element
     

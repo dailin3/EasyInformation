@@ -1,5 +1,7 @@
 from flask import url_for, abort
 import config
+import xml.etree.ElementTree as ET
+import json, click
 
 class Query:
     pass
@@ -56,3 +58,44 @@ def args_schema(args):
 
     return query
 
+def rss_schema(items):
+    # 创建 RSS 根元素
+    rss = ET.Element("rss", version="2.0", attrib={
+        "xmlns:content": "http://purl.org/rss/1.0/modules/content/"
+    })
+    channel = ET.SubElement(rss, "channel")
+
+    # 添加频道信息
+    ET.SubElement(channel, "title").text = "北邮消息列表"
+    ET.SubElement(channel, "link").text = f"{config.HOST}:{config.PORT}/info/rss"
+    ET.SubElement(channel, "description").text = "这里会展示爬虫爬取的消息"
+
+    # 动态生成 <item>
+    for article in items:
+        content_html = content_render(article)
+        item = ET.SubElement(channel, "item")
+        ET.SubElement(item, "title").text = article.title
+        ET.SubElement(item, "link").text = article.href
+        ET.SubElement(item, "description").text = article.summary
+        ET.SubElement(item, "pubDate").text = article.time
+        ET.SubElement(item, "guid").text = article.href
+        ET.SubElement(item, "content:encoded").text = content_html
+
+    # 将 XML 转换为字符串
+    rss_feed = ET.tostring(rss, encoding="utf-8", method="xml")
+    return rss_feed
+
+def content_render(item):
+    item_html = ''
+    for content in json.loads(item.content):
+        click.echo(content)
+        if content['type'] == 'p':
+            item_html += f'<p>{content["content"]}</p>'
+        elif content['type'] == 'img':
+            item_html += f'<img src="{content["href"]}" />'
+        elif content['type'] == 'a':
+            item_html += f'<a href="{content["href"]}">{content["content"]}</a>'
+        else:
+            item_html += f'<p>render error!</p>'
+
+    return item_html
