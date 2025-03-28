@@ -48,6 +48,9 @@ class BUPTInfoCrawler(Crawler):
         '''
         print(self.name + " start running")
 
+        # 重新连接CAS
+        self.reconnect_cas()
+
         # 获取信息列表
         info_list = self.get_info_list()
 
@@ -59,6 +62,14 @@ class BUPTInfoCrawler(Crawler):
         self.save_info_list(info_list)
 
         print(self.name + " stop running")
+
+    def reconnect_cas(self):
+        res = self.session.get(self.url)
+        if res.url != self.url:
+            print("reconnect to cas")
+            self.session = CAS(refresh=True)
+            # redirect to main page
+            res = self.session.get(self.url)
 
     def save_info_list(self, info_list: list) -> None:
         if database.is_closed:

@@ -6,7 +6,9 @@ dotenv.load_dotenv()
 class CAS:
     _history_session = []
 
-    def __init__(self, username = None, password = None):
+    def __init__(self, username = None, password = None, refresh = False):
+        if refresh:
+            self._history_session = []
         if len(self._history_session) == 0:
             if username is None:
                 username = os.getenv("BUPT_USERNAME")

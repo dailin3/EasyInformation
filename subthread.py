@@ -17,7 +17,7 @@ def start_crawlers_threads():
         if crawler_inst.status == "1":
             cron = CronTrigger().from_crontab(crawler_inst.cron)
             name = crawler_inst.name + "_thread"
-            scheduler.add_job(crawler_inst.run, trigger= cron, id= name)
+            scheduler.add_job(crawler_inst.run, trigger= cron, id= name, coalesce=True)
             print(name + " join to scheduler")
     scheduler.start()
 
