@@ -107,4 +107,6 @@ ENV/
 # Ignore all .DS_Store files
 .DS_Store
 
-.evn
+.env
+
+__pycache__
